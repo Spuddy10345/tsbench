@@ -90,3 +90,69 @@ def test_last_run_at_by_tier_ignores_interrupted_runs(store, run_fixture):
     assert store.last_run_at("full") == "2026-01-01T00:00:00+00:00"
     assert store.last_run_at("quick") == "2026-01-02T00:00:00+00:00"
     assert store.last_run_at() == "2026-01-02T00:00:00+00:00"
+
+
+# -- schema v2 / reads used by status and apply -------------------------------------
+
+def test_observations_join_runs_and_filter_by_time_and_network(store, run_fixture):
+    store.save_run(_meta("2026-01-01T00:00:00+00:00", network_tag="home"),
+                   build_results(run_fixture), tier="full")
+    store.save_run(_meta("2026-02-01T00:00:00+00:00", network_tag="cafe"),
+                   build_results(run_fixture), tier="quick")
+    everything = store.observations("2025-01-01")
+    assert {r["tier"] for r in everything} == {"full", "quick"}
+    assert all(r["baseline_down"] for r in everything)
+    assert {r["tier"] for r in store.observations("2026-01-15")} == {"quick"}
+    assert {r["tier"] for r in store.observations("2025-01-01", "home")} == {"full"}
+
+
+def test_runs_without_a_network_tag_are_kept_when_filtering(store, run_fixture):
+    store.save_run(_meta("2026-01-01T00:00:00+00:00"), build_results(run_fixture))
+    assert store.observations("2025-01-01", "home")
+
+
+def test_latest_network_tag(store, run_fixture):
+    assert store.latest_network_tag() is None
+    store.save_run(_meta("2026-01-01T00:00:00+00:00", network_tag="old"),
+                   build_results(run_fixture))
+    store.save_run(_meta("2026-02-01T00:00:00+00:00", network_tag="new"),
+                   build_results(run_fixture))
+    store.save_run(_meta("2026-03-01T00:00:00+00:00"), build_results(run_fixture))
+    assert store.latest_network_tag() == "new"
+
+
+def test_latency_history_uses_only_probe_tiers(store, run_fixture):
+    results = build_results(run_fixture)
+    host = next(r.node.hostname for r in results if not r.node.is_baseline)
+    store.save_run(_meta("2026-01-01T00:00:00+00:00"), results, tier="full")
+    assert store.latency_history(host) == []
+    store.save_run(_meta("2026-01-02T00:00:00+00:00"), results, tier="quick")
+    store.save_run(_meta("2026-01-03T00:00:00+00:00"), results, tier="screen")
+    assert len(store.latency_history(host)) == 2
+
+
+def test_applies_round_trip(store):
+    assert store.last_apply() is None
+    store.record_apply("a", "100.64.0.1", "b", "first")
+    store.record_apply("c", "100.64.0.3", "a", "second")
+    last = store.last_apply()
+    assert last["hostname"] == "c" and last["previous"] == "a" and last["reason"] == "second"
+
+
+def test_a_version_1_database_is_upgraded_in_place(tmp_path):
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        CREATE TABLE runs (id INTEGER PRIMARY KEY, started_at TEXT NOT NULL, tier TEXT NOT NULL,
+            duration_s REAL, tester TEXT, reps INTEGER, pinned_server INTEGER, tool_version TEXT,
+            network_tag TEXT, baseline_down REAL, baseline_up REAL, baseline_lat REAL,
+            original_exit TEXT, applied_node TEXT, interrupted INTEGER NOT NULL DEFAULT 0);
+        INSERT INTO runs (started_at, tier) VALUES ('2026-01-01T00:00:00+00:00', 'full');
+        PRAGMA user_version = 1;""")
+    conn.commit()
+    conn.close()
+    with Store(str(path)) as s:
+        assert len(s.list_runs()) == 1               # old data survives
+        s.record_apply("a", "100.64.0.1", None, "after upgrade")
+        assert s.last_apply()["hostname"] == "a"
+    assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION

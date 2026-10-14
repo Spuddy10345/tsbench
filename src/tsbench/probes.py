@@ -11,8 +11,13 @@ Units, verified against Ookla CLI 1.2.0.84 and librespeed-cli:
 
 from __future__ import annotations
 
+import http.client
 import json
+import socket
+import statistics
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -163,3 +168,166 @@ class LibrespeedTester(SpeedTester):
 
 
 TESTERS = {"ookla": OoklaTester, "librespeed": LibrespeedTester}
+
+
+# --------------------------------------------------------------------------- #
+# Built-in probe (screen and quick tiers)
+# --------------------------------------------------------------------------- #
+
+DEFAULT_PROBE_HOST = "1.1.1.1"
+DEFAULT_PROBE_PORT = 443
+DEFAULT_PROBE_URL = "https://speed.cloudflare.com/__down?bytes=25000000"
+
+
+def tcp_connect_ms(host: str, port: int, timeout: float) -> Optional[float]:
+    """Time for one TCP handshake, in ms; None if it failed.  Through an exit
+    node this is one round trip client -> node -> host, which is what we want."""
+    t0 = time.perf_counter()
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            pass
+    except OSError:
+        return None
+    return (time.perf_counter() - t0) * 1000.0
+
+
+def summarise_latency(samples: Sequence[Optional[float]]) -> Dict[str, Optional[float]]:
+    """Median latency, jitter (mean absolute difference of consecutive samples)
+    and packet-loss % (failed handshakes) from raw connect times."""
+    good = [s for s in samples if s is not None]
+    loss = 100.0 * (len(samples) - len(good)) / len(samples) if samples else None
+    if not good:
+        return {"latency_ms": None, "jitter_ms": None, "packet_loss_pct": loss}
+    jitter = (statistics.mean(abs(a - b) for a, b in zip(good, good[1:]))
+              if len(good) > 1 else 0.0)
+    return {"latency_ms": round(statistics.median(good), 3),
+            "jitter_ms": round(jitter, 3),
+            "packet_loss_pct": round(loss or 0.0, 3)}
+
+
+def http_download_mbps(url: str, cap_s: float, warmup_s: float = 1.0,
+                       io_timeout: float = 8.0) -> float:
+    """Stream `url` for at most `cap_s` seconds and return Mbps.
+
+    The endpoint serves a bounded file (Cloudflare refuses large sizes), and a
+    fast link finishes one in a fraction of a second, so requests are repeated
+    over one keep-alive connection until the time cap is reached.  Timing starts
+    at the first byte (connection set-up is excluded) and the first `warmup_s`
+    seconds are discarded when the transfer lasts that long, so TCP slow start
+    does not dominate a short probe.  Raises OSError or ValueError if nothing
+    could be downloaded."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ValueError(f"unsupported probe URL: {url!r}")
+    target = parts.path or "/"
+    if parts.query:
+        target += "?" + parts.query
+    conn_cls = (http.client.HTTPSConnection if parts.scheme == "https"
+                else http.client.HTTPConnection)
+    headers = {"User-Agent": f"{PROG}/{__version__}"}
+
+    total = 0
+    t_first = mark_t = None
+    mark_bytes = 0
+    conn = None
+    try:
+        while True:
+            if conn is None:
+                conn = conn_cls(parts.hostname, parts.port, timeout=io_timeout)
+            conn.request("GET", target, headers=headers)
+            resp = conn.getresponse()
+            if resp.status != 200:
+                raise ValueError(f"HTTP {resp.status} from {parts.hostname}")
+            got = 0
+            while True:
+                chunk = resp.read(65536)
+                now = time.perf_counter()
+                if not chunk:
+                    break
+                got += len(chunk)
+                total += len(chunk)
+                if t_first is None:
+                    t_first = now
+                elif mark_t is None and now - t_first >= warmup_s:
+                    mark_t, mark_bytes = now, total
+                if now - t_first >= cap_s:
+                    break
+            if got == 0:
+                raise ValueError("download returned no data")
+            if t_first is not None and time.perf_counter() - t_first >= cap_s:
+                break
+            if resp.will_close:
+                conn.close()
+                conn = None
+    finally:
+        if conn is not None:
+            conn.close()
+    end = time.perf_counter()
+    assert t_first is not None
+    if mark_t is not None and end - mark_t >= 0.5:
+        start_t, got_bytes = mark_t, total - mark_bytes
+    else:
+        start_t, got_bytes = t_first, total
+    return got_bytes * 8 / max(end - start_t, 1e-6) / 1e6
+
+
+class NativeProbe:
+    """Short, dependency-free probe used by the screen and quick tiers.
+
+    Latency is TCP-handshake time to a fixed host; throughput is a time-capped
+    single-stream HTTP download.  It needs no external binary and no licence.
+    Single-stream numbers read lower than Ookla's multi-stream ones, so they
+    are only comparable with other probe runs, never with full-tier numbers."""
+
+    name = "probe"
+    binary = ""
+    native = True
+    units_note = ("Built-in probe: latency = median TCP handshake time to the probe host, "
+                  "jitter = mean change between consecutive handshakes, loss = failed "
+                  "handshakes; download = single-stream HTTP, time-capped, in Mbps. "
+                  "Upload is not measured.")
+
+    def __init__(self, host: str = DEFAULT_PROBE_HOST, port: int = DEFAULT_PROBE_PORT,
+                 url: str = DEFAULT_PROBE_URL, cap_s: float = 6.0, samples: int = 5,
+                 connect_timeout: float = 3.0) -> None:
+        self.host, self.port, self.url = host, port, url
+        self.cap_s, self.samples, self.connect_timeout = cap_s, samples, connect_timeout
+
+    def latency(self, samples: Optional[int] = None) -> Dict[str, Optional[float]]:
+        n = samples or self.samples
+        raw = []
+        for i in range(n):
+            raw.append(tcp_connect_ms(self.host, self.port, self.connect_timeout))
+            if i + 1 < n:
+                time.sleep(0.05)
+        return summarise_latency(raw)
+
+    def measure(self, throughput: bool = True) -> Dict[str, Any]:
+        """One probe: latency always, throughput when asked.  Raises ValueError
+        when the host is unreachable or the download yields nothing."""
+        out: Dict[str, Any] = dict(self.latency())
+        if out["latency_ms"] is None:
+            raise ValueError(f"no TCP handshake to {self.host}:{self.port} succeeded")
+        out.update(upload_mbps=None, server=f"{self.host}:{self.port}", server_id=None,
+                   download_mbps=None)
+        if throughput:
+            try:
+                out["download_mbps"] = round(http_download_mbps(self.url, self.cap_s), 3)
+            except (urllib.error.URLError, OSError, ValueError) as exc:
+                raise ValueError(f"download probe failed: {exc}") from exc
+        return out
+
+    @classmethod
+    def from_settings(cls, s: Any) -> NativeProbe:
+        return cls(host=s.probe_host, url=s.probe_url, cap_s=s.probe_cap_s,
+                   samples=s.screen_samples)
+
+
+def probe_network_tag(timeout: float = 5.0) -> Optional[str]:
+    """A coarse label for the network we are on, from Mullvad's own check
+    endpoint.  Only meaningful while connected DIRECTLY (no exit node)."""
+    data = http_json(MULLVAD_CHECK_URL, timeout)
+    if not isinstance(data, dict) or data.get("mullvad_exit_ip"):
+        return None
+    org = str(data.get("organization") or "").strip()
+    return org[:80] or None

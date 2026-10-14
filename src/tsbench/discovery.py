@@ -28,7 +28,10 @@ def filter_nodes(all_nodes: List[Node], s: Settings) -> List[Node]:
     return chosen
 
 
-def select_nodes(ts: Tailscale, s: Settings, term: Term, log: Log) -> List[Node]:
+def select_nodes(ts: Tailscale, s: Settings, term: Term, log: Log,
+                 limit: bool = True) -> List[Node]:
+    """`limit=False` leaves --max-nodes to the caller (used when a screen decides
+    which nodes to keep)."""
     all_nodes = ts.discover()
     source = "tailscale status --json"
     if all_nodes and not any(n.city or n.city_code for n in all_nodes):
@@ -79,9 +82,9 @@ def select_nodes(ts: Tailscale, s: Settings, term: Term, log: Log) -> List[Node]
     if not chosen:
         raise Fatal("every matching node is offline; nothing was changed")
 
-    if s.max_nodes is not None:
-        if s.max_nodes < 1:
-            raise Fatal("--max-nodes must be >= 1")
+    if s.max_nodes is not None and s.max_nodes < 1:
+        raise Fatal("--max-nodes must be >= 1")
+    if limit and s.max_nodes is not None:
         if len(chosen) > s.max_nodes:
             log.info(f"limiting to the first {s.max_nodes} of {len(chosen)} nodes "
                      f"(--max-nodes)")

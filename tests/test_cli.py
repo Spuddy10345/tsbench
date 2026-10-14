@@ -18,14 +18,14 @@ def test_defaults_cover_every_uk_city_and_save_history():
     s = parse()
     assert s.cities == [] and s.exclude_cities == []
     assert s.country == "uk" and s.save is True and s.out_dir is None
-    assert s.reps == 3 and s.baseline is True
+    assert s.reps_n == 3 and s.baseline is True
 
 
 def test_flags_populate_settings():
     s = parse("--cities", "London, Glasgow", "--exclude-cities", "Manchester", "--no-save",
               "--reps", "5", "--no-baseline", "--out-dir", "x", "--tester", "librespeed")
     assert s.cities == ["London", "Glasgow"] and s.exclude_cities == ["Manchester"]
-    assert s.save is False and s.reps == 5 and s.baseline is False
+    assert s.save is False and s.reps_n == 5 and s.baseline is False
     assert s.out_dir == "x" and s.tester == "librespeed"
 
 

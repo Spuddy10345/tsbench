@@ -5,15 +5,16 @@ from __future__ import annotations
 import json
 import os
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import Any, Iterator, List, Optional, Tuple
 
 from tsbench.console import Log, Term, fmt
 from tsbench.errors import Fatal
 from tsbench.models import Node, NodeResult, RunResult
-from tsbench.probes import SpeedTester, probe_egress
+from tsbench.probes import SpeedTester, probe_egress, probe_network_tag
 from tsbench.proc import run
-from tsbench.settings import Settings
+from tsbench.settings import Settings, min_success_for
 from tsbench.tailscale import Tailscale
 
 
@@ -32,6 +33,18 @@ class Benchmark:
         self.restored_to = "unknown"
         self.pinned_server: Optional[int] = settings.server_id
         self.interrupted = False
+        self.network_tag: Optional[str] = None
+
+    @contextmanager
+    def using(self, tester: Any) -> Iterator[None]:
+        """Temporarily measure with a different tester (the screen and quick tiers
+        use the built-in probe even when a full run would use Ookla)."""
+        previous = self.tester
+        self.tester = tester
+        try:
+            yield
+        finally:
+            self.tester = previous
 
     # -- state handling ----------------------------------------------------- #
 
@@ -142,32 +155,49 @@ class Benchmark:
 
     # -- speed test --------------------------------------------------------- #
 
-    def speed_test(self, node: Node, rep: int, idx: int, total: int) -> RunResult:
-        prefix = f"[{idx}/{total}] {node.label}  rep {rep}/{self.a.reps}"
-        cmd = self.tester.command(self.pinned_server)
+    def speed_test(self, node: Node, rep: int, idx: int, total: int,
+                   reps: Optional[int] = None, throughput: bool = True) -> RunResult:
+        prefix = f"[{idx}/{total}] {node.label}  rep {rep}/{reps or self.a.reps_n}"
         started = datetime.now(timezone.utc)
         t0 = time.monotonic()
-        self.term.live(f"{prefix}  running {self.tester.name} speed test ...")
-        rc, out, errtxt = run(cmd, timeout=self.a.test_timeout)
-        dur = round(time.monotonic() - t0, 2)
+        what = "latency screen" if not throughput else f"{self.tester.name} speed test"
+        self.term.live(f"{prefix}  running {what} ...")
         res = RunResult(rep=rep, ok=False, started_at=started.isoformat(timespec="seconds"),
-                        duration_s=dur)
+                        duration_s=0.0)
 
-        if rc != 0 and not out.strip():
-            res.error = f"{self.tester.name} exited rc={rc}: {(errtxt or '').strip()[:300]}"
-            return res
-        try:
-            parsed = self.tester.parse(out)
-        except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
-            res.error = f"could not parse {self.tester.name} output: {exc}"
-            return res
+        raw = None
+        if getattr(self.tester, "native", False):
+            try:
+                parsed = self.tester.measure(throughput=throughput)
+            except ValueError as exc:
+                res.duration_s = round(time.monotonic() - t0, 2)
+                res.error = str(exc)
+                return res
+            res.duration_s = round(time.monotonic() - t0, 2)
+        else:
+            rc, out, errtxt = run(self.tester.command(self.pinned_server),
+                                  timeout=self.a.test_timeout)
+            res.duration_s = round(time.monotonic() - t0, 2)
+            if rc != 0 and not out.strip():
+                res.error = f"{self.tester.name} exited rc={rc}: {(errtxt or '').strip()[:300]}"
+                return res
+            try:
+                parsed = self.tester.parse(out)
+            except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
+                res.error = f"could not parse {self.tester.name} output: {exc}"
+                return res
+            raw = parsed.pop("raw", None)
 
-        raw = parsed.pop("raw", None)
         for k, v in parsed.items():
             setattr(res, k, v)
-        res.ok = res.download_mbps is not None
-        if not res.ok:
-            res.error = "speed test returned no download figure"
+        if throughput:
+            res.ok = res.download_mbps is not None
+            if not res.ok:
+                res.error = "speed test returned no download figure"
+        else:
+            res.ok = res.latency_ms is not None
+            if not res.ok:
+                res.error = "latency probe returned no figure"
 
         if res.ok and self.a.pin_server and self.pinned_server is None \
                 and res.server_id is not None:
@@ -187,10 +217,14 @@ class Benchmark:
 
     # -- main loop ---------------------------------------------------------- #
 
-    def run_all(self, nodes: List[Node]) -> List[NodeResult]:
+    def run_all(self, nodes: List[Node], reps: Optional[int] = None,
+                throughput: bool = True) -> List[NodeResult]:
+        """Measure each node in turn.  `reps` overrides the setting (screening
+        and quick runs take one sample); `throughput=False` is the latency screen."""
         results: List[NodeResult] = []
         total = len(nodes)
-        min_success = self.a.min_success
+        reps = reps or self.a.reps_n
+        min_success = min_success_for(reps)
 
         for idx, node in enumerate(nodes, 1):
             if self.interrupted:
@@ -200,12 +234,15 @@ class Benchmark:
 
             connected, verified, err = self.connect(node, idx, total)
             nr.connected, nr.verified, nr.connect_error = connected, verified, err
+            if connected and node.is_baseline and self.network_tag is None \
+                    and not self.a.no_egress_check:
+                self.network_tag = probe_network_tag(5.0)
 
             if not connected:
                 self.term.endlive()
                 self.log.say(f"  {self.term.red('FAIL')} [{idx}/{total}] "
                              f"{self.term.bold(node.label)}: {err}")
-                nr.aggregate(min_success)
+                nr.aggregate(min_success, need_down=throughput)
                 if self.a.fail_fast:
                     raise Fatal(f"--fail-fast: {node.label} could not be activated: {err}")
                 continue
@@ -214,35 +251,37 @@ class Benchmark:
             self.log.say(f"  {self.term.green('UP')}   [{idx}/{total}] "
                          f"{self.term.bold(node.label)} active ({tag})")
 
-            for rep in range(1, self.a.reps + 1):
+            native = getattr(self.tester, "native", False)
+            for rep in range(1, reps + 1):
                 if self.interrupted:
                     break
-                r = self.speed_test(node, rep, idx, total)
-                if r.ok:
+                r = self.speed_test(node, rep, idx, total, reps, throughput)
+                if r.ok and throughput and not native:
                     host, eip, _ = (None, None, True) if self.a.no_egress_check \
                         else probe_egress(4.0)
                     r.egress_host, r.egress_ip = host, eip
                 nr.runs.append(r)
                 self.term.endlive()
                 if r.ok:
+                    speeds = (f"{self.term.bold(fmt(r.download_mbps))} Mbps down / "
+                              f"{fmt(r.upload_mbps)} Mbps up / ") if throughput else ""
                     self.log.say(
-                        f"       rep {rep}/{self.a.reps}: "
-                        f"{self.term.bold(f'{r.download_mbps:.1f}')} Mbps down / "
-                        f"{r.upload_mbps:.1f} Mbps up / "
+                        f"       rep {rep}/{reps}: {speeds}"
                         f"{fmt(r.latency_ms)} ms lat / {fmt(r.jitter_ms)} ms jit"
                         + (f" / {r.packet_loss_pct:.1f}% loss" if r.packet_loss_pct else "")
                         + self.term.dim(f"  [{r.duration_s}s]"))
                 else:
-                    self.log.say(f"       rep {rep}/{self.a.reps}: "
+                    self.log.say(f"       rep {rep}/{reps}: "
                                  f"{self.term.red('failed')} - {r.error}")
-                if rep < self.a.reps:
+                if rep < reps:
                     time.sleep(max(0.0, self.a.rep_delay))
 
-            nr.aggregate(min_success)
+            nr.aggregate(min_success, need_down=throughput)
             if nr.status == "ok":
+                speeds = (f"{fmt(nr.med_down)} / {fmt(nr.med_up)} Mbps, "
+                          if throughput else "")
                 self.log.say(f"       {self.term.blue('median')}: "
-                             f"{nr.med_down:.1f} / {nr.med_up:.1f} Mbps, "
-                             f"{fmt(nr.med_lat)} ms, {nr.successes}/{len(nr.runs)} ok")
+                             f"{speeds}{fmt(nr.med_lat)} ms, {nr.successes}/{len(nr.runs)} ok")
             else:
                 self.log.say(f"       {self.term.yellow(nr.status)}: "
                              f"{nr.successes}/{len(nr.runs)} successful runs "

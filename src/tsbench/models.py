@@ -75,7 +75,7 @@ class NodeResult:
     rank: Optional[int] = None
     recommended: bool = False
 
-    def aggregate(self, min_success: int) -> None:
+    def aggregate(self, min_success: int, need_down: bool = True) -> None:
         good = [r for r in self.runs if r.ok]
         self.successes = len(good)
         self.failures = len(self.runs) - len(good)
@@ -94,7 +94,8 @@ class NodeResult:
             self.status = "failed"
         elif self.successes == 0:
             self.status = "failed"
-        elif self.successes < min_success or self.med_down is None or self.med_lat is None:
+        elif (self.successes < min_success or self.med_lat is None
+              or (need_down and self.med_down is None)):
             self.status = "inconclusive"
         else:
             self.status = "ok"

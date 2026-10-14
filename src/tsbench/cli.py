@@ -1,6 +1,8 @@
 """Command-line interface.
 
     tsbench [run] [flags]      benchmark exit nodes (bare `tsbench` is `run`)
+    tsbench status             show remembered standings from past runs
+    tsbench apply              switch to the best remembered node (no benchmarking)
     tsbench history list|prune inspect or trim the saved history
 """
 
@@ -20,12 +22,14 @@ from tsbench.bench import Benchmark
 from tsbench.console import Log, Term, fmt
 from tsbench.discovery import select_nodes
 from tsbench.errors import Fatal
-from tsbench.models import NodeResult, baseline_node, ranked_ok
+from tsbench.models import Node, NodeResult, baseline_node, ranked_ok
 from tsbench.preflight import Tools, preflight
-from tsbench.probes import TESTERS
+from tsbench.probes import TESTERS, NativeProbe
 from tsbench.report import render_table, write_outputs
 from tsbench.scoring import TOP_N, score_nodes
-from tsbench.settings import DEFAULT_COUNTRY, Settings, default_db_path
+from tsbench.screen import cut_outliers, failed_to_screen, pick_candidates, rank_screen
+from tsbench.settings import DEFAULT_COUNTRY, Settings, default_db_path, min_success_for
+from tsbench.standing import compute_estimates, ranked, window_start
 from tsbench.store import Store
 
 # --------------------------------------------------------------------------- #
@@ -41,6 +45,10 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="""\
 examples:
   tsbench                                    # every UK node, 3 reps, + DIRECT baseline
+  tsbench --quick                            # ~3 min: latency screen + short probe of the best
+  tsbench --screen-only                      # ~2 min: latency screen only
+  tsbench status                             # what the history says is best
+  tsbench apply --if-better                  # switch only if clearly worth it
   tsbench --dry-run                          # just show which nodes would be tested
   tsbench --cities London,Manchester         # custom city selection
   tsbench --max-nodes 5                      # limit the run
@@ -65,9 +73,33 @@ Pass --out-dir to also export JSON/CSV/Markdown for a run.
     g.add_argument("--include-offline", action="store_true",
                    help="also test nodes Tailscale reports as offline")
 
+    g = p.add_argument_group("tiers")
+    g.add_argument("--quick", action="store_true",
+                   help="latency-screen every node, then run one short built-in throughput "
+                        "probe on the best few plus remembered favourites (no Ookla)")
+    g.add_argument("--screen-only", action="store_true",
+                   help="latency screen only: connect to each node, take a few TCP "
+                        "handshake samples, measure no throughput")
+    g.add_argument("--no-screen", dest="screen", action="store_false",
+                   help="full run: skip the latency screen and test every selected node")
+    g.add_argument("--top", dest="top_k", type=int, default=5, metavar="K",
+                   help="--quick: probe the K best-screened nodes (default: 5)")
+    g.add_argument("--favourites", type=int, default=2, metavar="N",
+                   help="--quick: also probe the N best remembered nodes (default: 2)")
+    g.add_argument("--probe-url", default=None, metavar="URL",
+                   help="download used by the built-in throughput probe "
+                        "(default: Cloudflare's speed-test endpoint)")
+    g.add_argument("--probe-host", default="1.1.1.1", metavar="HOST",
+                   help="host whose TCP handshake time is the latency sample (default: 1.1.1.1)")
+    g.add_argument("--probe-seconds", dest="probe_cap_s", type=float, default=6.0, metavar="SEC",
+                   help="time cap for one throughput probe (default: 6)")
+    g.add_argument("--apply", action="store_true",
+                   help="after the run, switch to the best remembered node if it is clearly "
+                        "better than the current one (same rules as `apply --if-better`)")
+
     g = p.add_argument_group("benchmark")
-    g.add_argument("--reps", type=int, default=3, metavar="N",
-                   help="speed-test repetitions per node (default: 3)")
+    g.add_argument("--reps", type=int, default=None, metavar="N",
+                   help="repetitions per node (default: 3 for a full run, 1 for --quick)")
     g.add_argument("--tester", choices=sorted(TESTERS), default="ookla",
                    help="speed-test implementation (default: ookla)")
     g.add_argument("--tester-path", default=None, metavar="PATH",
@@ -86,8 +118,9 @@ Pass --out-dir to also export JSON/CSV/Markdown for a run.
                    help="measure a no-exit-node DIRECT reference first (default: on)")
     g.add_argument("--no-baseline", dest="baseline", action="store_false",
                    help="skip the DIRECT reference measurement")
-    g.add_argument("--switch-delay", type=float, default=3.0, metavar="SEC",
-                   help="settle time after finishing a node (default: 3)")
+    g.add_argument("--switch-delay", type=float, default=None, metavar="SEC",
+                   help="settle time after finishing a node (default: 3, or 1 for "
+                        "--quick/--screen-only)")
     g.add_argument("--rep-delay", type=float, default=1.0, metavar="SEC",
                    help="pause between repetitions on one node (default: 1)")
     g.add_argument("--ready-timeout", type=float, default=30.0, metavar="SEC",
@@ -156,12 +189,15 @@ def build_history_parser() -> argparse.ArgumentParser:
 
 
 def build_meta(s: Settings, tools: Tools, bench: Benchmark, results: List[NodeResult],
-               started_at: str, duration: float) -> Dict[str, Any]:
+               started_at: str, duration: float, tier: str = "full",
+               tester: Any = None, reps: Optional[int] = None) -> Dict[str, Any]:
+    tester = tester or tools.tester
     return {
-        "started_at": started_at, "duration_s": duration,
+        "started_at": started_at, "duration_s": duration, "tier": tier,
         "include_cities": s.cities, "exclude_cities": s.exclude_cities,
-        "country": s.country, "reps": s.reps, "min_success": s.min_success,
-        "tester": tools.tester.name, "units_note": tools.tester.units_note,
+        "country": s.country, "reps": reps or s.reps_n,
+        "min_success": min_success_for(reps or s.reps_n),
+        "tester": tester.name, "units_note": tester.units_note,
         "pinned_server": bench.pinned_server,
         "tool_version": __version__,
         "tailscale_version": tools.ts_version,
@@ -169,6 +205,7 @@ def build_meta(s: Settings, tools: Tools, bench: Benchmark, results: List[NodeRe
         "nodes_benchmarked": len([r for r in results if not r.node.is_baseline]),
         "baseline_included": bool(s.baseline),
         "egress_verification": not s.no_egress_check,
+        "network_tag": bench.network_tag,
         "original_exit_node": bench.original_label,
         "restored_to": bench.restored_to,
         "interrupted": bench.interrupted,
@@ -184,7 +221,7 @@ def print_report(results: List[NodeResult], recommended: List[NodeResult], s: Se
         "   down/up Mbps, lat/jit ms, loss %, score 0-100"))
     log.say(term.bold("=" * min(term.width - 1, 108)))
     log.say()
-    print(render_table(results, s.reps, term))
+    print(render_table(results, s.reps_n, term))
     log.say()
 
     base = next((r for r in results if r.node.is_baseline and r.status == "ok"), None)
@@ -204,9 +241,9 @@ def print_report(results: List[NodeResult], recommended: List[NodeResult], s: Se
         for i, r in enumerate(recommended, 1):
             log.say(f"  {term.green(str(i) + '.')} "
                     f"{term.bold(r.node.dns_name or r.node.hostname)}   "
-                    f"score {term.bold(f'{r.score:.1f}')}   "
+                    f"score {term.bold(fmt(r.score))}   "
                     f"{fmt(r.med_down)}/{fmt(r.med_up)} Mbps   "
-                    f"{fmt(r.med_lat)} ms   {r.successes}/{s.reps} runs ok")
+                    f"{fmt(r.med_lat)} ms   {r.successes}/{s.reps_n} runs ok")
             log.say(term.dim(f"      tailscale set --exit-node={r.node.ip}"))
     else:
         log.say(f"  {term.yellow('none')} - no node produced enough valid data "
@@ -225,22 +262,80 @@ def print_report(results: List[NodeResult], recommended: List[NodeResult], s: Se
     log.say()
 
 
+def print_screen_report(results: List[NodeResult], ranked_screen: List[NodeResult],
+                        dropped: List[NodeResult], s: Settings, term: Term, log: Log) -> None:
+    log.say()
+    log.say(term.bold("=" * min(term.width - 1, 108)))
+    log.say(term.bold("LATENCY SCREEN") + term.dim(
+        "   lat/jit ms, loss % (failed TCP handshakes); no throughput measured"))
+    log.say(term.bold("=" * min(term.width - 1, 108)))
+    log.say()
+    print(render_table(results, s.screen_samples, term))
+    log.say()
+    log.say(term.bold("Outcome") + f"  responsive: {term.bold(str(len(ranked_screen)))}   "
+            f"dropped as latency outliers: {term.bold(str(len(dropped)))}   "
+            f"failed: {term.bold(str(len(failed_to_screen(results))))}")
+    log.say(term.dim("  Latency only loosely predicts throughput; this is a filter, "
+                     "not a ranking of winners."))
+    log.say()
+
+
+def load_favourites(s: Settings, nodes: List[Node]) -> List[str]:
+    """Hostnames of the best remembered nodes among `nodes` (best first)."""
+    if s.favourites <= 0 or not os.path.exists(s.resolved_db_path):
+        return []
+    try:
+        with Store(s.resolved_db_path) as store:
+            rows = store.observations(window_start(14), store.latest_network_tag())
+    except (sqlite3.Error, RuntimeError, OSError):
+        return []
+    est = compute_estimates(rows)
+    return [e.hostname for e in ranked(est, allowed=[n.hostname for n in nodes])[:s.favourites]]
+
+
+def save_run(s: Settings, log: Log, meta: Dict[str, Any], results: List[NodeResult],
+             tier: str) -> Optional[int]:
+    if not s.save:
+        return None
+    try:
+        with Store(s.resolved_db_path) as store:
+            return store.save_run(meta, results, tier=tier)
+    except (sqlite3.Error, OSError, RuntimeError) as exc:
+        log.warn(f"could not save run to {s.resolved_db_path}: {exc}")
+        return None
+
+
+def estimate_minutes(s: Settings, targets: int, tier: Optional[str] = None) -> float:
+    tier = tier or s.tier
+    if tier == "full":
+        return (targets * s.reps_n * 25 + targets * s.switch_delay) / 60.0
+    per_node = 4.0 + s.switch_delay + (0 if tier == "screen" else s.probe_cap_s * s.reps_n)
+    return targets * per_node / 60.0
+
+
 def run_main(argv: List[str]) -> int:
     args = build_parser().parse_args(argv)
     s = Settings.from_args(args)
     term = Term(force_colour=s.colour)
     log = Log(term, s.log_file, s.quiet)
 
-    if s.reps < 1:
+    if s.reps_n < 1:
         log.err("--reps must be >= 1")
         return 2
     if s.keep_raw and not s.out_dir:
         log.err("--keep-raw needs --out-dir (raw files are written next to the export)")
         return 2
+    if s.quick and s.screen_only:
+        log.err("--quick and --screen-only are different tiers; pick one")
+        return 2
+    if s.top_k < 1:
+        log.err("--top must be >= 1")
+        return 2
 
     bench: Optional[Benchmark] = None
-    t_start = time.monotonic()
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    tier = s.tier
+    use_screen = tier != "full" or s.screen
 
     def on_signal(signum: int, _frame: Any) -> None:
         name = signal.Signals(signum).name
@@ -255,17 +350,20 @@ def run_main(argv: List[str]) -> int:
     signal.signal(signal.SIGTERM, on_signal)
 
     try:
-        log.say(term.bold(f"{PROG} {__version__}") + term.dim("  - Tailscale exit-node benchmark"))
+        log.say(term.bold(f"{PROG} {__version__}") + term.dim(
+            f"  - Tailscale exit-node benchmark  [{tier}]"))
         log.say()
         tools = preflight(s, term, log)
-        nodes = select_nodes(tools.ts, s, term, log)
+        nodes = select_nodes(tools.ts, s, term, log, limit=not use_screen)
 
         if s.dry_run:
             log.say()
-            log.ok(f"--dry-run: {len(nodes)} node(s) would be benchmarked "
-                   f"({s.reps} rep(s) each"
+            what = {"screen": "screened (latency only)",
+                    "quick": "screened, then the best few probed",
+                    "full": "benchmarked" + (" after a latency screen" if use_screen else "")}[tier]
+            log.ok(f"--dry-run: {len(nodes)} node(s) would be {what}"
                    + (", plus a DIRECT baseline" if s.baseline else "")
-                   + "). Nothing was changed.")
+                   + ". Nothing was changed.")
             return 0
 
         run_dir: Optional[str] = None
@@ -278,34 +376,91 @@ def run_main(argv: List[str]) -> int:
                             "to overwrite.")
 
         bench = Benchmark(s, tools.ts, tools.tester, term, log, run_dir)
+        probe = tools.tester if getattr(tools.tester, "native", False) \
+            else NativeProbe.from_settings(s)
         log.say()
         log.say(term.bold("Tailscale state"))
         bench.capture_original()
 
-        queue = list(nodes)
-        if s.baseline:
-            queue.insert(0, baseline_node())
-
-        est = len(queue) * s.reps * 25 + len(queue) * s.switch_delay
-        log.say()
-        log.say(term.bold("Benchmark") + term.dim(
-            f"  {len(queue)} target(s) x {s.reps} rep(s), sequential, "
-            f"rough estimate {est / 60:.0f} min"))
         where = s.resolved_db_path if s.save else "(not saving: --no-save)"
         log.say(term.dim(f"  history -> {where}"))
         if run_dir:
             log.say(term.dim(f"  export  -> {run_dir}"))
+
+        # -- 1. latency screen -------------------------------------------------
+        screened: List[NodeResult] = []
+        kept: List[NodeResult] = []
+        if use_screen:
+            queue = ([baseline_node()] if s.baseline else []) + list(nodes)
+            log.say()
+            log.say(term.bold("Latency screen") + term.dim(
+                f"  {len(queue)} target(s) x {s.screen_samples} TCP handshakes, "
+                f"rough estimate {estimate_minutes(s, len(queue), 'screen'):.0f} min"))
+            log.say()
+            s_start = time.monotonic()
+            with bench.using(probe):
+                screened = bench.run_all(queue, reps=1, throughput=False)
+            ranked_screen = rank_screen(screened)
+            for i, r in enumerate(ranked_screen, 1):
+                r.rank = i
+            kept, dropped = cut_outliers(ranked_screen)
+            for r in dropped:
+                r.status = "failed"
+                r.connect_error = (f"dropped by the screen: {r.med_lat:.0f} ms is far above "
+                                   f"the other nodes")
+                r.rank = None
+            sid = save_run(s, log, build_meta(
+                s, tools, bench, screened, started_at, round(time.monotonic() - s_start, 1),
+                tier="screen", tester=probe, reps=1), screened, "screen") \
+                if not bench.interrupted else None
+            if tier == "screen":
+                bench.restore()
+                print_screen_report(screened, kept, dropped, s, term, log)
+                if sid is not None:
+                    log.say(term.bold("Saved") + f"  history run #{sid} in {s.resolved_db_path}")
+                log.say(term.bold("Tailscale state: ") + f"exit node is now {bench.restored_to}")
+                return 0
+            if not kept and not bench.interrupted:
+                raise Fatal("no node answered the latency screen; nothing to measure further.\n"
+                            "        Check your connection, or run with --no-screen.")
+            if dropped:
+                log.info(f"dropped {len(dropped)} latency outlier(s): "
+                         + ", ".join(r.node.hostname for r in dropped))
+
+        # -- 2. throughput -----------------------------------------------------
+        if tier == "quick":
+            favs = load_favourites(s, [r.node for r in kept])
+            targets = pick_candidates(kept, favs, s.top_k)
+            tester: Any = probe
+        else:
+            targets = [r.node for r in kept] if use_screen else list(nodes)
+            if use_screen and s.max_nodes is not None and len(targets) > s.max_nodes:
+                log.info(f"keeping the {s.max_nodes} best-screened of {len(targets)} nodes "
+                         f"(--max-nodes)")
+                targets = targets[:s.max_nodes]
+            tester = tools.tester
+        queue = ([baseline_node()] if s.baseline else []) + targets
+        reps = s.reps_n
+        log.say()
+        log.say(term.bold("Benchmark") + term.dim(
+            f"  {len(queue)} target(s) x {reps} rep(s), sequential, rough estimate "
+            f"{estimate_minutes(s, len(queue)):.0f} min"))
+        if tier == "quick":
+            log.say(term.dim("  probing: " + ", ".join(n.hostname for n in targets)
+                             + (f"  (favourites: {', '.join(favs)})" if favs else "")))
         log.say()
 
-        results = bench.run_all(queue)
+        p_start = time.monotonic()
+        with bench.using(tester):
+            results = bench.run_all(queue, reps=reps, throughput=True)
         score_nodes(results)
 
-        ranked = ranked_ok(results)
-        recommended = ranked[:TOP_N]
+        ranked_ok_ = ranked_ok(results)
+        recommended = ranked_ok_[:TOP_N]
         for r in recommended:
             r.recommended = True
 
-        # -- restore or apply ------------------------------------------------
+        # -- restore or apply ----------------------------------------------------
         if s.apply_best and recommended:
             bench.restore(to_ip=recommended[0].node.ip, applying=True,
                           why="--apply-best: connecting to the top-ranked node")
@@ -316,18 +471,13 @@ def run_main(argv: List[str]) -> int:
             bench.restore()
 
         # -- persist ---------------------------------------------------------
-        duration = round(time.monotonic() - t_start, 1)
-        meta = build_meta(s, tools, bench, results, started_at, duration)
+        duration = round(time.monotonic() - p_start, 1)
+        meta = build_meta(s, tools, bench, results, started_at, duration, tier=tier,
+                          tester=tester, reps=reps)
         paths: Dict[str, str] = {}
         if run_dir:
             paths = write_outputs(run_dir, results, meta, recommended)
-        run_id: Optional[int] = None
-        if s.save:
-            try:
-                with Store(s.resolved_db_path) as store:
-                    run_id = store.save_run(meta, results, tier="full")
-            except (sqlite3.Error, OSError, RuntimeError) as exc:
-                log.warn(f"could not save run to {s.resolved_db_path}: {exc}")
+        run_id = save_run(s, log, meta, results, tier)
 
         # -- report ----------------------------------------------------------
         print_report(results, recommended, s, term, log)
@@ -344,6 +494,10 @@ def run_main(argv: List[str]) -> int:
         log.say(term.bold("Tailscale state: ") + f"exit node is now {bench.restored_to}")
         if bench.interrupted:
             log.warn("run was interrupted; results cover only the nodes completed above.")
+        elif s.apply and s.save:
+            from tsbench.apply import run_apply
+            d, _ = run_apply(tools.ts, s, if_better=True)
+            log.say(term.bold("Apply: ") + f"{d.action} - {d.reason}")
         return 0
 
     except KeyboardInterrupt:
@@ -403,6 +557,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] == "history":
         return history_main(args[1:])
+    if args and args[0] == "status":
+        from tsbench.status import status_main
+        return status_main(args[1:])
+    if args and args[0] == "apply":
+        from tsbench.apply import apply_main
+        return apply_main(args[1:])
     if args and args[0] == "run":
         args = args[1:]
     return run_main(args)

@@ -53,11 +53,16 @@ def score_nodes(results: List[NodeResult]) -> None:
             return 0.0
         return min(1.0, ref / val) if lower_better else min(1.0, val / ref)
 
+    # Quick runs measure no upload: drop that term and rescale the others so
+    # scores still span 0-100 instead of topping out at 80.
+    w_up = W_UP if b_up is not None else 0.0
+    scale = 1.0 / (W_DOWN + w_up + W_LAT + W_JIT)
+
     for r in pool:
-        raw = (W_DOWN * frac(r.med_down, b_down, False)
-               + W_UP * frac(r.med_up, b_up, False)
-               + W_LAT * frac(r.med_lat, b_lat, True)
-               + W_JIT * frac(r.med_jit, b_jit, True))
+        raw = scale * (W_DOWN * frac(r.med_down, b_down, False)
+                       + w_up * frac(r.med_up, b_up, False)
+                       + W_LAT * frac(r.med_lat, b_lat, True)
+                       + W_JIT * frac(r.med_jit, b_jit, True))
         attempted = max(1, len(r.runs))
         reliability = r.successes / attempted
         loss = r.loss_pct or 0.0

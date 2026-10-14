@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from tsbench.models import NodeResult
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -66,6 +66,14 @@ CREATE TABLE IF NOT EXISTS samples (
     loss_pct   REAL,
     server_id  INTEGER,
     error      TEXT
+);
+CREATE TABLE IF NOT EXISTS applies (
+    id        INTEGER PRIMARY KEY,
+    ts        TEXT NOT NULL,
+    hostname  TEXT,
+    ip        TEXT,
+    previous  TEXT,
+    reason    TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_node_runs_host ON node_runs(hostname, run_id);
 CREATE INDEX IF NOT EXISTS idx_samples_host ON samples(hostname, run_id);
@@ -175,6 +183,46 @@ class Store:
     def samples(self, run_id: int) -> List[sqlite3.Row]:
         return self.conn.execute(
             "SELECT * FROM samples WHERE run_id = ? ORDER BY hostname, rep", (run_id,)).fetchall()
+
+    def observations(self, since: str, network_tag: Optional[str] = None) -> List[sqlite3.Row]:
+        """Per-node results since `since` joined with their run, oldest first.
+        With `network_tag`, runs recorded on a different network are left out
+        (runs with no tag are kept)."""
+        sql = ("SELECT n.hostname, n.status, n.successes, n.attempted, n.med_down, n.med_up,"
+               " n.med_lat, n.med_jit, n.loss_pct, n.city, r.started_at, r.tier, r.network_tag,"
+               " r.baseline_down, r.baseline_up, r.baseline_lat"
+               " FROM node_runs n JOIN runs r ON r.id = n.run_id WHERE r.started_at >= ?")
+        args: List[Any] = [since]
+        if network_tag:
+            sql += " AND (r.network_tag IS NULL OR r.network_tag = ?)"
+            args.append(network_tag)
+        return self.conn.execute(sql + " ORDER BY r.started_at, n.id", args).fetchall()
+
+    def latest_network_tag(self) -> Optional[str]:
+        row = self.conn.execute("SELECT network_tag FROM runs WHERE network_tag IS NOT NULL"
+                                " ORDER BY started_at DESC, id DESC LIMIT 1").fetchone()
+        return row[0] if row else None
+
+    def latency_history(self, hostname: str, limit: int = 20) -> List[float]:
+        """Recent probe-measured latencies (screen and quick tiers only: the
+        full tier uses Ookla's ping, which is a different measurement)."""
+        rows = self.conn.execute(
+            "SELECT n.med_lat FROM node_runs n JOIN runs r ON r.id = n.run_id"
+            " WHERE n.hostname = ? AND r.tier IN ('screen', 'quick') AND n.status = 'ok'"
+            " AND n.med_lat IS NOT NULL ORDER BY r.started_at DESC, n.id DESC LIMIT ?",
+            (hostname, limit)).fetchall()
+        return [float(r[0]) for r in rows]
+
+    def record_apply(self, hostname: Optional[str], ip: Optional[str], previous: Optional[str],
+                     reason: str) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO applies (ts, hostname, ip, previous, reason) VALUES (?,?,?,?,?)",
+                (_utcnow(), hostname, ip, previous, reason))
+
+    def last_apply(self) -> Optional[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM applies ORDER BY ts DESC, id DESC LIMIT 1").fetchone()
 
     def last_run_at(self, tier: Optional[str] = None) -> Optional[str]:
         if tier:

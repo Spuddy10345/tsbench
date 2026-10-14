@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 from tsbench.console import Log, Term
 from tsbench.errors import Fatal
-from tsbench.probes import KNOWN_TESTER_PATHS, TESTERS, OoklaTester, SpeedTester
+from tsbench.probes import KNOWN_TESTER_PATHS, TESTERS, NativeProbe, OoklaTester, SpeedTester
 from tsbench.proc import find_executable, run
 from tsbench.settings import Settings
 from tsbench.tailscale import KNOWN_TAILSCALE_PATHS, Tailscale
@@ -35,12 +35,13 @@ INSTALL_HINTS = {
 @dataclass
 class Tools:
     ts: Tailscale
-    tester: SpeedTester
+    tester: Union[SpeedTester, NativeProbe]
     ts_version: str
     tester_version: str
 
 
-def preflight(s: Settings, term: Term, log: Log) -> Tools:
+def require_tailscale(s: Settings, log: Log) -> Tuple[Tailscale, str]:
+    """Locate `tailscale`, check the daemon is running; returns (client, version)."""
     ts_exe = find_executable("tailscale", KNOWN_TAILSCALE_PATHS,
                              s.tailscale_path or os.environ.get("TSBENCH_TAILSCALE"))
     if not ts_exe:
@@ -64,6 +65,19 @@ def preflight(s: Settings, term: Term, log: Log) -> Tools:
     if state != "Running":
         raise Fatal(f"Tailscale backend state is {state!r}, expected 'Running'.\n"
                     "        Run `tailscale up` and make sure this machine is authenticated.")
+    return ts, ts_ver
+
+
+def preflight(s: Settings, term: Term, log: Log) -> Tools:
+    ts, ts_ver = require_tailscale(s, log)
+
+    if s.tier != "full":
+        # Screen and quick tiers use the built-in probe: no binary, no licence.
+        probe = NativeProbe.from_settings(s)
+        log.info(f"tailscale: {term.dim(ts_ver)}")
+        log.info(f"probe: {term.dim('built-in')}  [{probe.name}]")
+        log.info(f"units: {term.dim(probe.units_note)}")
+        return Tools(ts=ts, tester=probe, ts_version=ts_ver, tester_version="built-in")
 
     cls = TESTERS[s.tester]
     st_exe = find_executable(cls.binary, KNOWN_TESTER_PATHS.get(cls.binary, ()), s.tester_path)
@@ -75,7 +89,8 @@ def preflight(s: Settings, term: Term, log: Log) -> Tools:
     if cls is OoklaTester:
         if not s.dry_run and not s.accept_ookla_license:
             raise Fatal(OOKLA_LICENSE_HELP)
-        tester: SpeedTester = OoklaTester(st_exe, accept_license=s.accept_ookla_license)
+        tester: Union[SpeedTester, NativeProbe] = OoklaTester(
+            st_exe, accept_license=s.accept_ookla_license)
     else:
         tester = cls(st_exe)
 
