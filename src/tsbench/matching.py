@@ -83,3 +83,16 @@ def country_matches(node: Node, query: str) -> bool:
         if cand and q == normalise(cand):
             return True
     return False
+
+
+def clean_name(value: str) -> str:
+    """Drop control characters (including terminal escapes) from a name that came
+    from the tailnet before it is printed or stored.  Peers choose their own
+    hostnames, so they are not trusted."""
+    return "".join(ch for ch in str(value) if ch.isprintable()).strip()
+
+
+def safe_filename(value: str) -> str:
+    """A name usable as a single path component, whatever the input."""
+    out = "".join(ch if (ch.isalnum() or ch in "-_.") else "_" for ch in str(value))
+    return out.strip(".") or "node"

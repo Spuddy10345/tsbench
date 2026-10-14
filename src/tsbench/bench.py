@@ -11,6 +11,7 @@ from typing import Any, Iterator, List, Optional, Tuple
 
 from tsbench.console import Log, Term, fmt
 from tsbench.errors import Fatal
+from tsbench.matching import safe_filename
 from tsbench.models import Node, NodeResult, RunResult
 from tsbench.probes import SpeedTester, probe_egress, probe_network_tag
 from tsbench.proc import run
@@ -208,7 +209,7 @@ class Benchmark:
         if self.a.keep_raw and raw is not None and self.run_dir:
             raw_dir = os.path.join(self.run_dir, "raw")
             os.makedirs(raw_dir, exist_ok=True)
-            fname = f"{node.hostname or 'direct'}-rep{rep}.json"
+            fname = f"{safe_filename(node.hostname or 'direct')}-rep{rep}.json"
             path = os.path.join(raw_dir, fname)
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(raw, fh, indent=2)

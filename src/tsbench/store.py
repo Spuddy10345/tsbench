@@ -89,8 +89,15 @@ class Store:
     def __init__(self, path: str) -> None:
         self.path = path
         parent = os.path.dirname(os.path.abspath(path))
-        os.makedirs(parent, exist_ok=True)
+        os.makedirs(parent, mode=0o700, exist_ok=True)
+        fresh = not os.path.exists(path)
         self.conn = sqlite3.connect(path, timeout=30)
+        if fresh:
+            # Node addresses and the network name are private: owner-only.
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self._migrate()

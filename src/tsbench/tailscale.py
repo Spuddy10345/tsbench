@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from tsbench.console import Log
 from tsbench.errors import Fatal
-from tsbench.matching import host_city_code, normalise
+from tsbench.matching import clean_name, host_city_code, normalise
 from tsbench.models import Node
 from tsbench.proc import run, run_json
 
@@ -64,13 +64,13 @@ class Tailscale:
             if not ip4:
                 continue
             nodes.append(Node(
-                hostname=peer.get("HostName") or "",
-                dns_name=(peer.get("DNSName") or "").rstrip("."),
+                hostname=clean_name(peer.get("HostName") or ""),
+                dns_name=clean_name((peer.get("DNSName") or "").rstrip(".")),
                 ip=ip4.split("/")[0],
-                city=loc.get("City") or "",
-                city_code=loc.get("CityCode") or "",
-                country=loc.get("Country") or "",
-                country_code=loc.get("CountryCode") or "",
+                city=clean_name(loc.get("City") or ""),
+                city_code=clean_name(loc.get("CityCode") or ""),
+                country=clean_name(loc.get("Country") or ""),
+                country_code=clean_name(loc.get("CountryCode") or ""),
                 online=bool(peer.get("Online")),
                 node_id=peer.get("ID") or "",
             ))

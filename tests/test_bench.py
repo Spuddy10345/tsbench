@@ -211,3 +211,22 @@ def test_failed_restore_is_reported_not_swallowed(status_uk):
     ts.fail_for = {""}                           # clearing the exit node will fail
     b.restore()
     assert b.restored_to.startswith("FAILED")
+
+
+def test_raw_files_cannot_be_written_outside_the_run_directory(status_uk, monkeypatch, tmp_path):
+    ts = StatefulTailscale(status_uk)
+    egress_follows_exit(monkeypatch, ts)
+    monkeypatch.setattr(bench_mod, "run", lambda cmd, timeout=None: (0, OOKLA_JSON, ""))
+    run_dir = tmp_path / "run"
+    s = Settings(reps=1, switch_delay=0, rep_delay=0, ready_timeout=0.2, keep_raw=True)
+    b = Benchmark(s, ts, OoklaTester("speedtest", accept_license=True),
+                  Term(force_colour=False), Log(Term(force_colour=False), None, quiet=True),
+                  run_dir=str(run_dir))
+    node = three_nodes(ts)[0]
+    node.hostname = "../../escaped"
+    ts.current = node.ip
+    b.speed_test(node, 1, 1, 1)
+    assert not (tmp_path / "escaped-rep1.json").exists()
+    files = sorted(p.name for p in (run_dir / "raw").iterdir())
+    assert files == ["_.._escaped-rep1.json"]                  # one file, inside raw/
+    assert not any(p.name.startswith("escaped") for p in tmp_path.iterdir())

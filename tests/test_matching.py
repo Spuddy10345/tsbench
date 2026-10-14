@@ -78,3 +78,20 @@ def test_country_matches_display_code_and_hostname(query):
 def test_country_matches_rejects_other_countries_and_allows_empty():
     assert not country_matches(node(), "de")
     assert country_matches(node(), "")
+
+
+# -- names from the tailnet are not trusted ---------------------------------------
+
+def test_clean_name_strips_terminal_escapes_and_control_characters():
+    from tsbench.matching import clean_name
+    assert clean_name("gb-lon-wg-001") == "gb-lon-wg-001"
+    assert clean_name("evil\x1b[31m\x07name\n") == "evil[31mname"
+    assert clean_name("  padded  ") == "padded"
+
+
+def test_safe_filename_cannot_escape_a_directory():
+    from tsbench.matching import safe_filename
+    for hostile in ("../../etc/passwd", "a/b", "..", "", "/abs", "x\\y"):
+        out = safe_filename(hostile)
+        assert "/" not in out and "\\" not in out and out not in ("", ".", "..")
+    assert safe_filename("gb-lon-wg-001") == "gb-lon-wg-001"

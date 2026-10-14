@@ -156,3 +156,12 @@ def test_a_version_1_database_is_upgraded_in_place(tmp_path):
         s.record_apply("a", "100.64.0.1", None, "after upgrade")
         assert s.last_apply()["hostname"] == "a"
     assert sqlite3.connect(path).execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+
+
+def test_database_and_state_dir_are_owner_only(tmp_path):
+    import os
+    import stat
+    path = tmp_path / "private" / "t.db"
+    Store(str(path)).close()
+    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+    assert stat.S_IMODE(os.stat(path.parent).st_mode) == 0o700

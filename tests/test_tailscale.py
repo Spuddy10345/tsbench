@@ -72,3 +72,12 @@ def test_parse_exit_node_table_keeps_cities_with_spaces_and_commas():
 def test_parse_exit_node_table_refuses_to_guess_without_header():
     with pytest.raises(Fatal):
         parse_exit_node_table("nothing useful here\n")
+
+
+def test_discovery_cleans_hostile_peer_names(status_uk):
+    from conftest import FakeTailscale
+    peer = next(iter(status_uk["Peer"].values()))
+    peer["HostName"] = "gb-lon-wg-999\x1b]0;pwned\x07"
+    names = [n.hostname for n in FakeTailscale(status_uk).discover()]
+    assert "gb-lon-wg-999]0;pwned" in names
+    assert not any("\x1b" in n or "\x07" in n for n in names)
