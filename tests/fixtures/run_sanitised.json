@@ -1,0 +1,560 @@
+{
+ "reps": 3,
+ "results": [
+  {
+   "hostname": "",
+   "city": "direct",
+   "is_baseline": true,
+   "ip": "",
+   "stored_rank": null,
+   "stored_score": null,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 792.965,
+     "upload_mbps": 99.949,
+     "latency_ms": 25.319,
+     "jitter_ms": 2.81,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 840.901,
+     "upload_mbps": 103.042,
+     "latency_ms": 28.678,
+     "jitter_ms": 1.556,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 894.75,
+     "upload_mbps": 103.41,
+     "latency_ms": 28.697,
+     "jitter_ms": 1.128,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-001",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.1",
+   "stored_rank": 3,
+   "stored_score": 90.07,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 771.736,
+     "upload_mbps": 98.493,
+     "latency_ms": 23.931,
+     "jitter_ms": 3.713,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 764.287,
+     "upload_mbps": 96.816,
+     "latency_ms": 22.762,
+     "jitter_ms": 1.269,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 719.557,
+     "upload_mbps": 88.686,
+     "latency_ms": 24.746,
+     "jitter_ms": 4.393,
+     "packet_loss_pct": 1.034
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-002",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.2",
+   "stored_rank": 4,
+   "stored_score": 90.07,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 760.389,
+     "upload_mbps": 97.544,
+     "latency_ms": 26.207,
+     "jitter_ms": 2.784,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 720.859,
+     "upload_mbps": 88.567,
+     "latency_ms": 24.309,
+     "jitter_ms": 4.709,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 806.77,
+     "upload_mbps": 99.287,
+     "latency_ms": 22.491,
+     "jitter_ms": 0.158,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-003",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.3",
+   "stored_rank": 6,
+   "stored_score": 86.78,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 769.008,
+     "upload_mbps": 94.704,
+     "latency_ms": 28.675,
+     "jitter_ms": 2.2,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 792.344,
+     "upload_mbps": 68.303,
+     "latency_ms": 27.792,
+     "jitter_ms": 3.444,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 656.782,
+     "upload_mbps": 98.638,
+     "latency_ms": 20.985,
+     "jitter_ms": 0.75,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-004",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.4",
+   "stored_rank": 5,
+   "stored_score": 88.82,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 775.157,
+     "upload_mbps": 98.516,
+     "latency_ms": 28.686,
+     "jitter_ms": 1.081,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 704.608,
+     "upload_mbps": 98.645,
+     "latency_ms": 23.745,
+     "jitter_ms": 3.559,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 780.824,
+     "upload_mbps": 97.127,
+     "latency_ms": 25.834,
+     "jitter_ms": 6.104,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-005",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.5",
+   "stored_rank": 7,
+   "stored_score": 85.27,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 751.405,
+     "upload_mbps": 95.453,
+     "latency_ms": 28.664,
+     "jitter_ms": 1.675,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 749.339,
+     "upload_mbps": 97.554,
+     "latency_ms": 27.686,
+     "jitter_ms": 3.285,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 772.931,
+     "upload_mbps": 92.747,
+     "latency_ms": 24.431,
+     "jitter_ms": 3.495,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-006",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.6",
+   "stored_rank": 10,
+   "stored_score": 82.79,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 767.94,
+     "upload_mbps": 98.125,
+     "latency_ms": 46.961,
+     "jitter_ms": 5.737,
+     "packet_loss_pct": 0.344
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 731.329,
+     "upload_mbps": 88.828,
+     "latency_ms": 28.918,
+     "jitter_ms": 3.104,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 663.613,
+     "upload_mbps": 97.418,
+     "latency_ms": 26.175,
+     "jitter_ms": 52.039,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-007",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.7",
+   "stored_rank": 1,
+   "stored_score": 99.59,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 705.946,
+     "upload_mbps": 99.334,
+     "latency_ms": 28.834,
+     "jitter_ms": 0.123,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 785.186,
+     "upload_mbps": 98.871,
+     "latency_ms": 24.264,
+     "jitter_ms": 3.604,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 799.203,
+     "upload_mbps": 94.123,
+     "latency_ms": 22.443,
+     "jitter_ms": 0.575,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-008",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.8",
+   "stored_rank": 2,
+   "stored_score": 91.68,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 760.056,
+     "upload_mbps": 97.588,
+     "latency_ms": 28.779,
+     "jitter_ms": 1.0,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 800.472,
+     "upload_mbps": 98.691,
+     "latency_ms": 22.586,
+     "jitter_ms": 1.568,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 740.841,
+     "upload_mbps": 97.13,
+     "latency_ms": 24.296,
+     "jitter_ms": 4.49,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-101",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.9",
+   "stored_rank": 8,
+   "stored_score": 85.13,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 737.623,
+     "upload_mbps": 98.07,
+     "latency_ms": 28.316,
+     "jitter_ms": 4.481,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 770.018,
+     "upload_mbps": 82.192,
+     "latency_ms": 23.246,
+     "jitter_ms": 1.334,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 744.52,
+     "upload_mbps": 98.292,
+     "latency_ms": 27.531,
+     "jitter_ms": 5.089,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-102",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.10",
+   "stored_rank": 9,
+   "stored_score": 84.54,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 718.79,
+     "upload_mbps": 99.143,
+     "latency_ms": 32.895,
+     "jitter_ms": 1.314,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 762.514,
+     "upload_mbps": 83.249,
+     "latency_ms": 26.936,
+     "jitter_ms": 1.854,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 764.424,
+     "upload_mbps": 93.234,
+     "latency_ms": 30.252,
+     "jitter_ms": 8.112,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-103",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.11",
+   "stored_rank": 11,
+   "stored_score": 81.51,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 721.547,
+     "upload_mbps": 95.308,
+     "latency_ms": 31.031,
+     "jitter_ms": 6.677,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 735.521,
+     "upload_mbps": 98.171,
+     "latency_ms": 32.031,
+     "jitter_ms": 4.035,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 771.095,
+     "upload_mbps": 97.436,
+     "latency_ms": 26.258,
+     "jitter_ms": 4.832,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-305",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.12",
+   "stored_rank": 13,
+   "stored_score": 72.92,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 636.209,
+     "upload_mbps": 98.336,
+     "latency_ms": 37.407,
+     "jitter_ms": 4.774,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 653.343,
+     "upload_mbps": 89.989,
+     "latency_ms": 37.179,
+     "jitter_ms": 3.028,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 568.049,
+     "upload_mbps": 98.146,
+     "latency_ms": 31.7,
+     "jitter_ms": 4.283,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-306",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.13",
+   "stored_rank": 12,
+   "stored_score": 80.01,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 726.257,
+     "upload_mbps": 98.09,
+     "latency_ms": 36.632,
+     "jitter_ms": 13.015,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 767.898,
+     "upload_mbps": 81.128,
+     "latency_ms": 32.6,
+     "jitter_ms": 2.252,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 766.012,
+     "upload_mbps": 66.281,
+     "latency_ms": 29.517,
+     "jitter_ms": 1.05,
+     "packet_loss_pct": 0.0
+    }
+   ]
+  },
+  {
+   "hostname": "gb-lon-wg-308",
+   "city": "London",
+   "is_baseline": false,
+   "ip": "100.64.1.14",
+   "stored_rank": 14,
+   "stored_score": 71.1,
+   "runs": [
+    {
+     "rep": 1,
+     "ok": true,
+     "download_mbps": 723.916,
+     "upload_mbps": 99.014,
+     "latency_ms": 40.047,
+     "jitter_ms": 3.402,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 2,
+     "ok": true,
+     "download_mbps": 513.445,
+     "upload_mbps": 81.023,
+     "latency_ms": 33.593,
+     "jitter_ms": 4.677,
+     "packet_loss_pct": 0.0
+    },
+    {
+     "rep": 3,
+     "ok": true,
+     "download_mbps": 620.434,
+     "upload_mbps": 98.271,
+     "latency_ms": 41.358,
+     "jitter_ms": 3.286,
+     "packet_loss_pct": 1.274
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,472 @@
+{
+  "BackendState": "Running",
+  "ExitNodeStatus": null,
+  "Peer": {
+    "nodekey:0001": {
+      "ID": "n0001",
+      "HostName": "us-lax-wg-402",
+      "DNSName": "us-lax-wg-402.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.2",
+        "fd7a:115c:a1e0::1"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "USA",
+        "CountryCode": "US",
+        "City": "Los Angeles, CA",
+        "CityCode": "LAX",
+        "Priority": 100
+      }
+    },
+    "nodekey:0002": {
+      "ID": "n0002",
+      "HostName": "gb-mnc-wg-004",
+      "DNSName": "gb-mnc-wg-004.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.3",
+        "fd7a:115c:a1e0::2"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "Manchester",
+        "CityCode": "MNC",
+        "Priority": 100
+      }
+    },
+    "nodekey:0003": {
+      "ID": "n0003",
+      "HostName": "de-dus-wg-102",
+      "DNSName": "de-dus-wg-102.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.4",
+        "fd7a:115c:a1e0::3"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "Germany",
+        "CountryCode": "DE",
+        "City": "Dusseldorf",
+        "CityCode": "DUS",
+        "Priority": 150
+      }
+    },
+    "nodekey:0004": {
+      "ID": "n0004",
+      "HostName": "gb-lon-wg-103",
+      "DNSName": "gb-lon-wg-103.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.5",
+        "fd7a:115c:a1e0::4"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0005": {
+      "ID": "n0005",
+      "HostName": "gb-lon-wg-001",
+      "DNSName": "gb-lon-wg-001.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.6",
+        "fd7a:115c:a1e0::5"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0006": {
+      "ID": "n0006",
+      "HostName": "gb-lon-wg-006",
+      "DNSName": "gb-lon-wg-006.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.7",
+        "fd7a:115c:a1e0::6"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0007": {
+      "ID": "n0007",
+      "HostName": "gb-lon-wg-002",
+      "DNSName": "gb-lon-wg-002.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.8",
+        "fd7a:115c:a1e0::7"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 1
+      }
+    },
+    "nodekey:0008": {
+      "ID": "n0008",
+      "HostName": "gb-lon-wg-102",
+      "DNSName": "gb-lon-wg-102.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.9",
+        "fd7a:115c:a1e0::8"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0009": {
+      "ID": "n0009",
+      "HostName": "gb-lon-wg-007",
+      "DNSName": "gb-lon-wg-007.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.10",
+        "fd7a:115c:a1e0::9"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0010": {
+      "ID": "n0010",
+      "HostName": "gb-mnc-wg-202",
+      "DNSName": "gb-mnc-wg-202.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.11",
+        "fd7a:115c:a1e0::a"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "Manchester",
+        "CityCode": "MNC",
+        "Priority": 1
+      }
+    },
+    "nodekey:0011": {
+      "ID": "n0011",
+      "HostName": "gb-lon-wg-004",
+      "DNSName": "gb-lon-wg-004.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.12",
+        "fd7a:115c:a1e0::b"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0012": {
+      "ID": "n0012",
+      "HostName": "gb-lon-wg-308",
+      "DNSName": "gb-lon-wg-308.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.13",
+        "fd7a:115c:a1e0::c"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0013": {
+      "ID": "n0013",
+      "HostName": "gb-lon-wg-305",
+      "DNSName": "gb-lon-wg-305.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.14",
+        "fd7a:115c:a1e0::d"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0014": {
+      "ID": "n0014",
+      "HostName": "gb-mnc-wg-001",
+      "DNSName": "gb-mnc-wg-001.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.15",
+        "fd7a:115c:a1e0::e"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "Manchester",
+        "CityCode": "MNC",
+        "Priority": 200
+      }
+    },
+    "nodekey:0015": {
+      "ID": "n0015",
+      "HostName": "gb-lon-wg-003",
+      "DNSName": "gb-lon-wg-003.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.16",
+        "fd7a:115c:a1e0::f"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0016": {
+      "ID": "n0016",
+      "HostName": "gb-lon-wg-005",
+      "DNSName": "gb-lon-wg-005.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.17",
+        "fd7a:115c:a1e0::10"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0017": {
+      "ID": "n0017",
+      "HostName": "gb-lon-wg-101",
+      "DNSName": "gb-lon-wg-101.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.18",
+        "fd7a:115c:a1e0::11"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0018": {
+      "ID": "n0018",
+      "HostName": "gb-glw-wg-002",
+      "DNSName": "gb-glw-wg-002.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.19",
+        "fd7a:115c:a1e0::12"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "Glasgow",
+        "CityCode": "GLW",
+        "Priority": 100
+      }
+    },
+    "nodekey:0019": {
+      "ID": "n0019",
+      "HostName": "gb-lon-wg-008",
+      "DNSName": "gb-lon-wg-008.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.20",
+        "fd7a:115c:a1e0::13"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 1
+      }
+    },
+    "nodekey:0020": {
+      "ID": "n0020",
+      "HostName": "gb-glw-wg-001",
+      "DNSName": "gb-glw-wg-001.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.21",
+        "fd7a:115c:a1e0::14"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "Glasgow",
+        "CityCode": "GLW",
+        "Priority": 100
+      }
+    },
+    "nodekey:0021": {
+      "ID": "n0021",
+      "HostName": "gb-mnc-wg-201",
+      "DNSName": "gb-mnc-wg-201.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.22",
+        "fd7a:115c:a1e0::15"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "Manchester",
+        "CityCode": "MNC",
+        "Priority": 400
+      }
+    },
+    "nodekey:0022": {
+      "ID": "n0022",
+      "HostName": "gb-lon-wg-306",
+      "DNSName": "gb-lon-wg-306.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.23",
+        "fd7a:115c:a1e0::16"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "London",
+        "CityCode": "LON",
+        "Priority": 100
+      }
+    },
+    "nodekey:0023": {
+      "ID": "n0023",
+      "HostName": "gb-mnc-wg-002",
+      "DNSName": "gb-mnc-wg-002.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.24",
+        "fd7a:115c:a1e0::17"
+      ],
+      "Online": true,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "Manchester",
+        "CityCode": "MNC",
+        "Priority": 200
+      }
+    },
+    "nodekey:0024": {
+      "ID": "n0024",
+      "HostName": "gb-mnc-wg-003",
+      "DNSName": "gb-mnc-wg-003.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.0.25",
+        "fd7a:115c:a1e0::18"
+      ],
+      "Online": false,
+      "ExitNodeOption": true,
+      "ExitNode": false,
+      "Location": {
+        "Country": "UK",
+        "CountryCode": "GB",
+        "City": "Manchester",
+        "CityCode": "MNC",
+        "Priority": 100
+      }
+    },
+    "nodekey:9001": {
+      "ID": "n9001",
+      "HostName": "laptop",
+      "DNSName": "laptop.example.ts.net.",
+      "TailscaleIPs": [
+        "100.64.9.1"
+      ],
+      "Online": true,
+      "ExitNodeOption": false
+    }
+  }
+}

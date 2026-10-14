@@ -1,0 +1,26 @@
+# Benchmark output: contains tailnet names, Tailscale IPs and your public IP.
+tsbench-results/
+results/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
