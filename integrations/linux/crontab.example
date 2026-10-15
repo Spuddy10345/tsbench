@@ -1,0 +1,13 @@
+# cron alternative to the systemd timer. Install with `crontab -e`.
+#
+# cron runs with a minimal PATH, so give the full path to tsbench
+# (`command -v tsbench`) and to tailscale if it is not in /usr/bin.
+# Exit codes 10 (skipped by a guard) and 11 (another run active) are normal.
+#
+# Switching exit node without sudo needs your user to be the Tailscale operator:
+#   sudo tailscale set --operator=$USER
+
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Every hour, a few minutes past, with low priority.
+7 * * * * nice -n 10 "$HOME/.local/bin/tsbench" auto

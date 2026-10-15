@@ -28,7 +28,8 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from tsbench import PROG
 from tsbench.console import Log, Term
 from tsbench.discovery import filter_nodes
-from tsbench.errors import Fatal
+from tsbench.errors import EXIT_LOCKED, Fatal
+from tsbench.lock import LockBusy, RunLock, describe_holder
 from tsbench.models import Node
 from tsbench.preflight import require_tailscale
 from tsbench.probes import NativeProbe
@@ -248,6 +249,15 @@ def apply_main(argv: List[str]) -> int:
     s.probe_host = args.probe_host
     term = Term(force_colour=s.colour)
     log = Log(term, None, quiet=args.json)
+    lock: Optional[RunLock] = None
+    if not args.dry_run:                  # never switch under a running benchmark
+        lock = RunLock("apply")
+        try:
+            lock.acquire()
+        except LockBusy as busy:
+            log.err(f"{describe_holder(busy.holder)} is using the exit node; "
+                    f"try again when it has finished.")
+            return EXIT_LOCKED
     try:
         ts, _ = require_tailscale(s, log)
         d, had_data = run_apply(ts, s, if_better=args.if_better, force=args.force,
@@ -259,6 +269,9 @@ def apply_main(argv: List[str]) -> int:
     except Fatal as exc:
         log.err(str(exc))
         return EXIT_ERROR
+    finally:
+        if lock is not None:
+            lock.release()
 
 
 def _print_decision(d: Decision, args: argparse.Namespace, term: Term, log: Log) -> None:

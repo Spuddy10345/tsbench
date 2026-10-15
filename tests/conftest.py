@@ -16,6 +16,13 @@ def load_fixture(name: str) -> Any:
         return json.load(fh)
 
 
+@pytest.fixture(autouse=True)
+def isolated_state(tmp_path_factory, monkeypatch):
+    """No test may touch the real ~/.local/state/tsbench (history, run lock, logs)."""
+    monkeypatch.setenv("TSBENCH_HOME", str(tmp_path_factory.mktemp("tsbench-home")))
+    monkeypatch.delenv("TSBENCH_ACCEPT_OOKLA_LICENSE", raising=False)
+
+
 @pytest.fixture
 def status_uk() -> Dict[str, Any]:
     return load_fixture("status_uk.json")

@@ -277,3 +277,79 @@ def test_apply_does_not_create_a_database_when_there_is_no_history(env, tmp_path
     db = tmp_path / "absent.db"
     assert main(["apply", "--db", str(db)]) == 4
     assert not os.path.exists(db)
+
+
+# -- remembered refresh, the run lock, and the one-line status ---------------------------
+
+def test_remembered_probes_only_the_best_remembered_nodes_with_no_screen(env, capsys):
+    build_history(env)
+    before = len(runs(env["db"]))
+    env["install"](FakeProbe(env["ts"]))
+    probe = env["probe"]
+    assert main(["--quick", "--remembered", "2", "--db", env["db"], *FAST]) == 0
+    after = runs(env["db"])
+    assert [x["tier"] for x in after[before:]] == ["quick"]        # no screen run was recorded
+    assert all(throughput for _ip, throughput in probe.calls)       # nothing was latency-screened
+    probed = {ip for ip, _t in probe.calls if ip}
+    assert len(probed) == 2
+    assert env["ts"].current == env["start"]                         # restored as usual
+
+
+def test_remembered_falls_back_to_the_screen_without_history(env, capsys):
+    probe = FakeProbe(env["ts"])
+    env["install"](probe)
+    assert main(["--quick", "--remembered", "2", "--top", "2", "--favourites", "0",
+                 "--db", env["db"], *FAST]) == 0
+    assert "no remembered nodes yet" in capsys.readouterr().out
+    assert [x["tier"] for x in runs(env["db"])] == ["screen", "quick"]
+
+
+def test_remembered_needs_quick(capsys):
+    assert main(["--remembered", "3"]) == 2
+    assert main(["--quick", "--remembered", "-1"]) == 2
+
+
+def test_a_manual_run_refuses_while_another_run_holds_the_lock(env, capsys):
+    from tsbench.errors import EXIT_LOCKED
+    from tsbench.lock import RunLock
+    env["install"](FakeProbe(env["ts"]))
+    with RunLock("auto"):
+        assert main(["--quick", "--db", env["db"], *FAST]) == EXIT_LOCKED
+    assert "automatic run" in capsys.readouterr().err
+    assert env["ts"].calls == []                                     # exit node never touched
+
+
+def test_dry_run_does_not_need_the_lock(env, capsys):
+    from tsbench.lock import RunLock
+    env["install"](FakeProbe(env["ts"]))
+    with RunLock("auto"):
+        assert main(["--quick", "--dry-run", *FAST]) == 0
+
+
+def test_apply_refuses_under_a_running_benchmark_but_dry_run_is_fine(env, capsys, monkeypatch):
+    from tsbench import apply as apply_mod
+    from tsbench.errors import EXIT_LOCKED
+    from tsbench.lock import RunLock
+    build_history(env)
+    monkeypatch.setattr(apply_mod, "require_tailscale", lambda s, log: (env["ts"], "t"))
+    env["ts"].calls.clear()
+    with RunLock("run"):
+        assert main(["apply", "--db", env["db"], "--no-colour"]) == EXIT_LOCKED
+        assert env["ts"].calls == []
+        assert main(["apply", "--dry-run", "--db", env["db"], "--no-colour"]) == 0
+
+
+def test_the_lock_is_released_after_a_run(env):
+    from tsbench.lock import RunLock
+    env["install"](FakeProbe(env["ts"]))
+    assert main(["--screen-only", "--db", env["db"], *FAST]) == 0
+    with RunLock("next"):
+        pass
+
+
+def test_status_oneline_is_a_single_summary_line(env, capsys):
+    build_history(env)
+    capsys.readouterr()
+    assert main(["status", "--oneline", "--no-current", "--db", env["db"]]) == 0
+    out = capsys.readouterr().out.strip().splitlines()
+    assert len(out) == 1 and out[0].startswith("Best: gb-") and "last full run" in out[0]

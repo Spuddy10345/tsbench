@@ -21,11 +21,11 @@ time.
   completion, on error, and on Ctrl-C.
 - **Standard library only.** No pip dependencies.
 
-> **Status: 2.0 in development.** Everything described here is implemented and
-> tested. Scheduled background refreshes (`tsbench auto`, launchd, Raycast
-> commands) are planned but **not built yet**, so this README does not document
-> them. Time estimates for the short tiers are design targets until they have
-> been measured on a real tailnet (see [Performance](#performance)).
+> **Status: 2.0, pre-release.** Everything described here is implemented and
+> covered by tests. Two things have **not** been measured on a real tailnet yet:
+> how long the short tiers take end to end, and how closely a quick run agrees
+> with a full run (see [Performance](#performance)). The scheduled job has been
+> checked against the real launchd, but not left running for days.
 >
 > tsbench is an independent project. It is not affiliated with or endorsed by
 > Mullvad, Tailscale or Ookla.
@@ -93,7 +93,7 @@ in the middle of something that can't tolerate a few reconnects.
 | Tier | Command | What it does |
 |---|---|---|
 | screen | `--screen-only` | Connects to each node, takes 5 TCP-handshake latency samples, measures no throughput. Reports latency, jitter and handshake loss. |
-| quick | `--quick` | Screens, then runs **one** time-capped download probe on the `--top K` best-screened nodes (default 5) plus the `--favourites N` best remembered nodes (default 2), plus a direct baseline. No Ookla. |
+| quick | `--quick` | Screens, then runs **one** time-capped download probe on the `--top K` best-screened nodes (default 5) plus the `--favourites N` best remembered nodes (default 2), plus a direct baseline. No Ookla. With `--remembered N` it skips the screen and probes only the N best remembered nodes (about a minute): this is what scheduled refreshes use. |
 | full | *(default)* | Screens first, drops clear latency outliers, then runs the Ookla test `--reps` times (default 3) on the survivors plus a direct baseline. `--max-nodes N` keeps the best N *by screen*. `--no-screen` tests every node as before. |
 
 The screen is a **filter, not a ranking**. Latency only loosely predicts
@@ -213,6 +213,103 @@ reports a near-tie group, and applies hysteresis.
 Absolute throughput also moved a lot between runs (the direct line measured
 63-66 Mbps in two early runs and 735-851 Mbps later), and the Ookla server
 picked changed every run, so only same-run comparisons are meaningful.
+
+## Running it automatically
+
+Three ways to trigger it without typing, all built on one command.
+
+### `tsbench auto`
+
+One unattended step, meant for a scheduler. Each call does exactly one thing:
+
+| Situation | What it does |
+|---|---|
+| The last **full** run is older than `--full-every-hours` (default 18), or there is none | A full run (screen, then Ookla on the survivors), then `apply --if-better` |
+| Otherwise | A **refresh**: probe only the `--refresh-nodes` (default 3) best remembered nodes plus a baseline, then `apply --if-better` |
+| A guard says the machine is busy | Nothing (exit code 10) |
+| Another tsbench run is active | Nothing (exit code 11) |
+
+A full run needs Ookla's licence to have been accepted by you
+(`--accept-ookla-license`). Without that, the periodic "deep" run is a wide
+quick run with the built-in probe instead. tsbench never accepts it for you.
+
+`apply --if-better` is the same rule as before: switch only if the current node
+is unhealthy or clearly worse, never inside the cooldown, never over a node you
+chose yourself. `tsbench auto --dry-run` prints the guard verdict and the plan
+without doing anything. Output goes to `~/.local/state/tsbench/auto.log`
+(rotated at 1 MB, one previous file kept).
+
+**Guards** (`--no-guard` disables all of them):
+
+- **Battery**: skip on battery power (`--allow-battery` to permit it).
+- **Activity**: skip unless the keyboard and mouse have been idle for
+  `--min-idle` seconds (default 60, macOS only; `0` disables). A benchmark
+  reroutes your traffic, so it waits until you are away.
+- **Calls**: skip while a process named in `--call-app` is running (repeatable).
+  The default list is `CptHost` (Zoom's in-meeting helper) and `FaceTime`. This
+  is a **heuristic**: apps such as Teams or Zoom's main window run all day
+  without a call in progress, so matching them would disable scheduled runs
+  for most people. Add your own with `--call-app`.
+
+Where a platform cannot answer (idle time off macOS), the guard passes.
+
+**One run at a time.** Anything that switches exit node takes a lock
+(`run.lock` in the state directory). A manual `tsbench`, `tsbench apply` or
+`auto` that finds it held says who has it and exits with code 11 instead of
+fighting over the exit node. `--dry-run` does not need it. The lock is released
+by the kernel if a run is killed, so there is nothing stale to clean up.
+
+Exit codes: `0` ok, `1` error, `10` skipped by a guard, `11` another run active.
+
+### macOS: `tsbench schedule`
+
+```sh
+tsbench schedule install            # every 2 hours; add --accept-ookla-license for full runs
+tsbench schedule status             # installed? loaded? what did it last do?
+tsbench schedule uninstall
+```
+
+This writes a launchd **user agent** (`~/Library/LaunchAgents/io.github.spuddy10345.tsbench.plist`)
+and loads it into your login session. No root. It never runs at login, only on
+its interval. launchd starts jobs with a minimal `PATH`, so `install` records the
+absolute paths of the Python that runs tsbench and of `tailscale` / `speedtest`.
+Re-run `install` after moving or upgrading the Python environment tsbench lives
+in. `tsbench schedule install --dry-run` prints the agent without writing it.
+
+### Raycast
+
+`integrations/raycast/` has three [Script Commands](https://github.com/raycast/script-commands).
+In Raycast: *Settings > Extensions > Script Commands > Add Directories*, and
+choose that folder.
+
+| Command | Mode | Does |
+|---|---|---|
+| tsbench: apply best exit node | silent | `tsbench apply`: switch to the best remembered node now |
+| tsbench: quick re-test | silent | starts `tsbench --quick --apply` in the background and returns at once |
+| tsbench: show best exit nodes | compact | `tsbench status --oneline`: top group, current node, age of the last full run |
+
+Raycast starts scripts with a minimal `PATH`; each script sets its own and finds
+`tsbench` on it. If yours lives elsewhere set `TSBENCH_BIN` to its full path.
+
+### Linux
+
+There is no installer. `integrations/linux/` has a systemd user timer
+(`tsbench-auto.service` and `.timer`) and a `crontab.example`. Battery and call
+guards work; the idle guard has no Linux source and passes. To switch exit node
+without sudo your user must be the Tailscale operator
+(`sudo tailscale set --operator=$USER`). The Linux examples have **not** been run
+on a real Linux machine; CI exercises the test suite there.
+
+### Data use
+
+The quick probe is time-capped, not size-capped, so the data it moves grows with
+your line speed. As arithmetic (line speed x seconds, not a measurement): on an
+800 Mbps line a 4 second probe is about 400 MB, and a refresh of three nodes plus
+a baseline is four probes, so **roughly 1.5 GB per step**; at 100 Mbps it is
+about a tenth of that. A full run adds Ookla's own transfers. That is why the
+installer defaults to every 2 hours and a refresh probe is 4 seconds. Lower it
+with `--probe-seconds`, `--refresh-nodes` or `--interval-hours`, and **do not
+schedule this on a metered connection**.
 
 ## Full-run options
 
@@ -353,6 +450,8 @@ about 1 s (screen) or about 7 s (quick probe), which suggests roughly **2
 minutes for a screen and 3-4 for a quick run on ~22 nodes**. That is an
 estimate from the design, **not yet measured end to end**; this section will be
 replaced with measured numbers and a comparison of quick against full rankings.
+A scheduled refresh (`--remembered 3`, no screen) is three probes plus a baseline,
+about a minute by the same arithmetic.
 
 ## Verified behaviour
 
@@ -419,11 +518,15 @@ and jitter differentiate.
 - Packet loss comes from the test tool (or handshake failures in the probe), not
   from an independent measurement.
 
-## Not yet built
+## Roadmap and known gaps
 
-Scheduled refreshes (`tsbench auto` with guards for battery, calls and
-activity), a launchd installer, Raycast script commands, and Linux
-cron/systemd examples. Track progress in the repository's issues.
+- **Validation run.** Run `--quick` and a full run back to back several times on
+  a real tailnet to measure real timings, check that the screen drops genuinely
+  bad nodes, and tune the thresholds (10% margin, 2 h cooldown, 18 h full-run
+  interval). Until then those numbers are starting values.
+- **Mid-run activity.** The idle guard is checked when a scheduled step starts,
+  not during it; a full run can take 10-15 minutes.
+- **Windows** is not supported.
 
 ## Contributing, security and licence
 

@@ -67,6 +67,7 @@ class Settings:
     screen: bool = True              # full tier: screen first, test only the survivors
     top_k: int = 5                   # quick: probe this many of the best-screened nodes
     favourites: int = 2              # quick: ...plus this many top remembered nodes
+    remembered: int = 0              # quick: no screen, probe only the N best remembered nodes
     screen_samples: int = 5
     probe_host: str = "1.1.1.1"
     probe_url: str = "https://speed.cloudflare.com/__down?bytes=25000000"
