@@ -25,6 +25,17 @@ A rewrite of the 1.0 single-file script into a tested, stdlib-only package.
 - `tsbench apply`: switch exit node from memory without benchmarking, with
   hysteresis (`--if-better`, a 10% margin, a 2 hour cooldown), a health check,
   and a guard that never touches a node tsbench does not manage.
+- `tsbench auto`: one unattended step for a scheduler. It runs a full benchmark
+  when the last one is stale, otherwise a one-minute refresh of the best
+  remembered nodes (`--quick --remembered N`), then `apply --if-better`.
+- Guards for scheduled runs: battery, recent keyboard/mouse activity, and a call
+  in progress (a configurable, deliberately narrow list of process names).
+- A run lock so a manual run, `apply` and `auto` never fight over the exit node.
+- `tsbench schedule install|uninstall|status`: a macOS launchd user agent with
+  absolute tool paths, a rotated log, and no run at login.
+- Raycast Script Commands (apply best, quick re-test, show best), a systemd
+  timer and a cron example.
+- `tsbench status --oneline`.
 - UK-wide coverage by default (London, Manchester, Glasgow).
 - `SECURITY.md`, a test suite, CI and a rewritten README.
 
