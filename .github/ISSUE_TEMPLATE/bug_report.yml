@@ -1,0 +1,49 @@
+name: Bug report
+description: Something did not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste benchmark output, `tsbench status --json`, or database
+        contents.** They contain your tailnet name, Tailscale IPs and public IP.
+        Redact them first (for example replace IPs with `100.64.x.x`).
+  - type: input
+    id: version
+    attributes:
+      label: tsbench version
+      description: Output of `tsbench --version`
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and Python version
+      placeholder: macOS 15, Python 3.13
+    validations:
+      required: true
+  - type: input
+    id: tailscale
+    attributes:
+      label: Tailscale version
+      description: Output of `tailscale version`
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Include the error text. Redact addresses and names.
+    validations:
+      required: true

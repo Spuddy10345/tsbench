@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Keeps the SHA-pinned actions in .github/workflows current via reviewed PRs.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7 # let a new release settle before proposing it
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Bump"
+
+  # tsbench has no runtime dependencies; this only covers the dev extras.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      dev-tools:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Bump"

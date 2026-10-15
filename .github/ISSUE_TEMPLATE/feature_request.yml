@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the problem first; the solution can come after.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like tsbench to do?
+  - type: dropdown
+    id: deps
+    attributes:
+      label: Would it need a runtime dependency?
+      description: tsbench is standard-library only on purpose.
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+    validations:
+      required: true

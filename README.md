@@ -1,5 +1,10 @@
 # tsbench
 
+[![CI](https://github.com/Spuddy10345/tsbench/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Spuddy10345/tsbench/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)
+![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen.svg)
+
 Find the fastest Mullvad exit node on your Tailscale network, remember what it
 learned, and switch to a good one without running a 30-minute benchmark every
 time.
@@ -61,7 +66,7 @@ let tsbench run it non-interactively with `--accept-ookla-license` or
 From a checkout (tsbench is not published to PyPI):
 
 ```sh
-git clone <this repository> && cd tsbench
+git clone https://github.com/Spuddy10345/tsbench.git && cd tsbench
 pip install .          # or: pipx install .
 tsbench --version
 ```
@@ -418,4 +423,14 @@ and jitter differentiate.
 
 Scheduled refreshes (`tsbench auto` with guards for battery, calls and
 activity), a launchd installer, Raycast script commands, and Linux
-cron/systemd examples. See the roadmap in the project notes.
+cron/systemd examples. Track progress in the repository's issues.
+
+## Contributing, security and licence
+
+- Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+  [code of conduct](CODE_OF_CONDUCT.md). `main` is protected, so changes land
+  through a pull request that passes CI.
+- Report security problems privately, as described in
+  [SECURITY.md](SECURITY.md).
+- Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+- Released under the [MIT licence](LICENSE).
