@@ -4,6 +4,8 @@
     tsbench status             show remembered standings from past runs
     tsbench apply              switch to the best remembered node (no benchmarking)
     tsbench history list|prune inspect or trim the saved history
+    tsbench auto               one scheduled step: guards, then a refresh or a full run
+    tsbench schedule ...       install/uninstall/status of the macOS launchd job
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import signal
 import sqlite3
 import sys
 import time
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -21,7 +24,8 @@ from tsbench import PROG, __version__
 from tsbench.bench import Benchmark
 from tsbench.console import Log, Term, fmt
 from tsbench.discovery import select_nodes
-from tsbench.errors import Fatal
+from tsbench.errors import EXIT_LOCKED, Fatal
+from tsbench.lock import LockBusy, RunLock, describe_holder
 from tsbench.models import Node, NodeResult, baseline_node, ranked_ok
 from tsbench.preflight import Tools, preflight
 from tsbench.probes import TESTERS, NativeProbe
@@ -49,6 +53,7 @@ examples:
   tsbench --screen-only                      # ~2 min: latency screen only
   tsbench status                             # what the history says is best
   tsbench apply --if-better                  # switch only if clearly worth it
+  tsbench auto                               # one scheduled step (see `tsbench schedule`)
   tsbench --dry-run                          # just show which nodes would be tested
   tsbench --cities London,Manchester         # custom city selection
   tsbench --max-nodes 5                      # limit the run
@@ -86,6 +91,10 @@ Pass --out-dir to also export JSON/CSV/Markdown for a run.
                    help="--quick: probe the K best-screened nodes (default: 5)")
     g.add_argument("--favourites", type=int, default=2, metavar="N",
                    help="--quick: also probe the N best remembered nodes (default: 2)")
+    g.add_argument("--remembered", type=int, default=0, metavar="N",
+                   help="--quick: skip the latency screen and probe only the N best remembered "
+                        "nodes (about a minute; falls back to the screen when there is no "
+                        "history). This is what scheduled refreshes use")
     g.add_argument("--probe-url", default=None, metavar="URL",
                    help="download used by the built-in throughput probe "
                         "(default: Cloudflare's speed-test endpoint)")
@@ -313,7 +322,8 @@ def estimate_minutes(s: Settings, targets: int, tier: Optional[str] = None) -> f
     return targets * per_node / 60.0
 
 
-def run_main(argv: List[str]) -> int:
+def run_main(argv: List[str], locked: bool = False) -> int:
+    """Run the benchmark.  `locked` means the caller already holds the run lock."""
     args = build_parser().parse_args(argv)
     s = Settings.from_args(args)
     term = Term(force_colour=s.colour)
@@ -331,6 +341,20 @@ def run_main(argv: List[str]) -> int:
     if s.top_k < 1:
         log.err("--top must be >= 1")
         return 2
+    if s.remembered < 0 or (s.remembered and not s.quick):
+        log.err("--remembered needs --quick and a number >= 1")
+        return 2
+
+    lock: Optional[RunLock] = None
+    if not s.dry_run and not locked:
+        lock = RunLock("run")
+        try:
+            lock.acquire()
+        except LockBusy as busy:
+            log.err(f"{describe_holder(busy.holder)} is already changing the exit node; "
+                    f"try again when it has finished.")
+            log.close()
+            return EXIT_LOCKED
 
     bench: Optional[Benchmark] = None
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -355,6 +379,15 @@ def run_main(argv: List[str]) -> int:
         log.say()
         tools = preflight(s, term, log)
         nodes = select_nodes(tools.ts, s, term, log, limit=not use_screen)
+        remembered: Optional[List[Node]] = None
+        if tier == "quick" and s.remembered:
+            favs = load_favourites(replace(s, favourites=s.remembered), nodes)
+            if favs:
+                by_host = {n.hostname: n for n in nodes}
+                remembered = [by_host[h] for h in favs]
+                use_screen = False
+            else:
+                log.info("no remembered nodes yet; screening instead")
 
         if s.dry_run:
             log.say()
@@ -428,9 +461,14 @@ def run_main(argv: List[str]) -> int:
                          + ", ".join(r.node.hostname for r in dropped))
 
         # -- 2. throughput -----------------------------------------------------
+        favs = []
         if tier == "quick":
-            favs = load_favourites(s, [r.node for r in kept])
-            targets = pick_candidates(kept, favs, s.top_k)
+            if remembered is not None:
+                favs = [n.hostname for n in remembered]
+                targets = list(remembered)
+            else:
+                favs = load_favourites(s, [r.node for r in kept])
+                targets = pick_candidates(kept, favs, s.top_k)
             tester: Any = probe
         else:
             targets = [r.node for r in kept] if use_screen else list(nodes)
@@ -518,6 +556,8 @@ def run_main(argv: List[str]) -> int:
         if bench is not None and not bench.restored:
             bench.restore(why="cleanup")
         log.close()
+        if lock is not None:
+            lock.release()
 
 
 # --------------------------------------------------------------------------- #
@@ -563,6 +603,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args and args[0] == "apply":
         from tsbench.apply import apply_main
         return apply_main(args[1:])
+    if args and args[0] == "auto":
+        from tsbench.auto import auto_main
+        return auto_main(args[1:])
+    if args and args[0] == "schedule":
+        from tsbench.schedule import schedule_main
+        return schedule_main(args[1:])
     if args and args[0] == "run":
         args = args[1:]
     return run_main(args)

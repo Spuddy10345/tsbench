@@ -26,6 +26,8 @@ def build_status_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument("-n", "--limit", type=int, default=10, metavar="N",
                    help="rows to show (default: 10)")
+    p.add_argument("--oneline", action="store_true",
+                   help="print a single summary line (for status bars and launchers)")
     p.add_argument("--no-current", action="store_true",
                    help="do not ask Tailscale which node is active")
     p.add_argument("--tailscale-path", default=None, metavar="PATH")
@@ -90,6 +92,11 @@ def status_main(argv: List[str]) -> int:
         print("History exists but holds no throughput measurements yet. "
               f"Run `{PROG} --quick`.")
         return 4
+    if args.oneline:
+        names = ", ".join(e.hostname for e in group[:3]) + (" +more" if len(group) > 3 else "")
+        now_on = ("" if current is None else f" | now: {current or 'direct'}")
+        print(f"Best: {names}{now_on} | last full run {_ago(last_full, now)}")
+        return 0
     print(term.bold("Remembered standing") + term.dim(
         f"  last {WINDOW_DAYS:g} days" + (f", network: {tag}" if tag else "")))
     print(term.dim("  est = recency-weighted standing, discounted for failures and "

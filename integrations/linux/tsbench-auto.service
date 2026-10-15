@@ -1,0 +1,24 @@
+# systemd user unit: one scheduled tsbench step.
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp tsbench-auto.service tsbench-auto.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now tsbench-auto.timer
+#
+# Switching exit node without sudo needs your user to be the Tailscale operator:
+#   sudo tailscale set --operator=$USER
+# Edit ExecStart if tsbench is not in ~/.local/bin (`command -v tsbench`).
+[Unit]
+Description=tsbench: refresh exit-node standings and apply the best node
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/tsbench auto
+# Uncomment only if you have accepted Ookla's licence yourself:
+# Environment=TSBENCH_ACCEPT_OOKLA_LICENSE=1
+Nice=10
+IOSchedulingClass=idle
+# Exit codes 10 (skipped by a guard) and 11 (another run active) are not failures.
+SuccessExitStatus=10 11
