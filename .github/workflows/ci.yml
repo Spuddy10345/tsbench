@@ -51,7 +51,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        # Pinned so Python 3.9 stays available when ubuntu-latest moves to Ubuntu 26
+        # (2026-10-19). Move it deliberately, after checking the older interpreters.
+        os: [ubuntu-24.04]
         python: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
         include:
           - os: macos-latest
